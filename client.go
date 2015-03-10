@@ -10,7 +10,7 @@ import (
 	"io"
 	"log"
 	"math/rand"
-
+	"crypto/tls"
 	"golang.org/x/net/websocket"
 )
 
@@ -332,12 +332,27 @@ func (c *Client) send() {
 
 // Connect will connect to server with an optional origin.
 // More details here: http://godoc.org/code.google.com/p/go.net/websocket#Dial
-func (c *Client) Connect(server, origin string) error {
+func (c *Client) Connect(server string, origin string, headers map[string]string, insecureSkipVerify bool) error {
 	if debug {
 		log.Print("turnpike: connect")
 	}
 	var err error
-	if c.ws, err = websocket.Dial(server, wampProtocolId, origin); err != nil {
+
+	var config *websocket.Config
+	if config, err = websocket.NewConfig(server, origin); err != nil {
+		return fmt.Errorf("Cannot create websocket config: %s", err);
+	}
+	
+	if insecureSkipVerify {
+		tlsConfig := tls.Config{InsecureSkipVerify: true}
+		config.TlsConfig = &tlsConfig
+	}
+	
+	for key, value := range headers {
+		config.Header.Add(key, value)
+	}
+	
+	if c.ws, err = websocket.DialConfig(config); err != nil {
 		return fmt.Errorf("Error connecting to websocket server: %s", err)
 	}
 
